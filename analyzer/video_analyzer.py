@@ -30,8 +30,9 @@ FLOW_NORMALIZER = 6.0
 
 # Quality gate thresholds
 MIN_PROCESSED_FRAMES_HARD = 12
-MIN_FACE_DETECT_RATIO_HARD = 0.03
-MIN_GLOBAL_MOTION_HARD = 0.01
+MIN_FACE_DETECT_RATIO_HARD = 0.10
+MIN_EYE_CONTACT_RATIO_HARD = 0.05
+MIN_GLOBAL_MOTION_HARD = 0.02
 
 MIN_PROCESSED_FRAMES_WARN = 80
 MIN_FACE_DETECT_RATIO_WARN = 0.20
@@ -103,6 +104,7 @@ class VideoAnalyzer:
 
         frame_count = int(feature_vector.get("frame_count", 0.0))
         face_detect_ratio = float(metadata.get("face_detect_ratio", feature_vector.get("eye_contact_ratio", 0.0)))
+        eye_contact_ratio = float(feature_vector.get("eye_contact_ratio", 0.0))
         global_motion = float(feature_vector.get("global_motion_mean", 0.0))
 
         # Hard-reject clearly invalid/empty submissions.
@@ -111,7 +113,14 @@ class VideoAnalyzer:
                 "Recording is too short or unreadable. Please record again with camera on and stable lighting."
             )
 
-        if face_detect_ratio < MIN_FACE_DETECT_RATIO_HARD and global_motion < MIN_GLOBAL_MOTION_HARD:
+        # Reject if a visible face is not detected for a minimum fraction of the session.
+        if face_detect_ratio < MIN_FACE_DETECT_RATIO_HARD:
+            raise RuntimeError(
+                "No visible person detected in the recording. Please keep your face and upper body in frame and retry."
+            )
+
+        # Reject if face is weakly detected and there is almost no camera-facing engagement signal.
+        if face_detect_ratio < 0.18 and eye_contact_ratio < MIN_EYE_CONTACT_RATIO_HARD and global_motion < MIN_GLOBAL_MOTION_HARD:
             raise RuntimeError(
                 "No visible person detected in the recording. Please keep your face and upper body in frame and retry."
             )
