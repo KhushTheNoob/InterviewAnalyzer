@@ -28,6 +28,14 @@ MAX_VALID_FPS = 120.0
 MAX_REASONABLE_FRAME_COUNT = 10_000_000
 FLOW_NORMALIZER = 6.0
 
+# Quality gate thresholds
+MIN_PROCESSED_FRAMES_HARD = 12
+MIN_FACE_DETECT_RATIO_HARD = 0.03
+MIN_GLOBAL_MOTION_HARD = 0.01
+
+MIN_PROCESSED_FRAMES_WARN = 80
+MIN_FACE_DETECT_RATIO_WARN = 0.20
+
 
 @dataclass
 class FramePacket:
@@ -77,6 +85,10 @@ class VideoAnalyzer:
         # Produce candidate-friendly recommendations.
         feedback = generate_feedback(feature_vector, scores)
 
+        # Validate analysis quality and reject unusable recordings.
+        quality_warnings = self._assess_quality(feature_vector, metadata)
+        metadata["quality_warnings"] = quality_warnings
+
         return {
             "video_path": str(source),
             "metadata": metadata,
@@ -84,6 +96,43 @@ class VideoAnalyzer:
             "scores": scores,
             "feedback": feedback,
         }
+
+    def _assess_quality(self, feature_vector: Dict[str, float], metadata: Dict[str, Any]) -> List[str]:
+        """Assess recording quality, raise for unusable input, and return warning messages."""
+        warnings: List[str] = []
+
+        frame_count = int(feature_vector.get("frame_count", 0.0))
+        face_detect_ratio = float(metadata.get("face_detect_ratio", feature_vector.get("eye_contact_ratio", 0.0)))
+        global_motion = float(feature_vector.get("global_motion_mean", 0.0))
+
+        # Hard-reject clearly invalid/empty submissions.
+        if frame_count < MIN_PROCESSED_FRAMES_HARD:
+            raise RuntimeError(
+                "Recording is too short or unreadable. Please record again with camera on and stable lighting."
+            )
+
+        if face_detect_ratio < MIN_FACE_DETECT_RATIO_HARD and global_motion < MIN_GLOBAL_MOTION_HARD:
+            raise RuntimeError(
+                "No visible person detected in the recording. Please keep your face and upper body in frame and retry."
+            )
+
+        # Non-fatal warnings for low-confidence analyses.
+        if frame_count < MIN_PROCESSED_FRAMES_WARN:
+            warnings.append(
+                "Low frame coverage detected. Results may be less reliable; consider re-recording in better conditions."
+            )
+
+        if face_detect_ratio < MIN_FACE_DETECT_RATIO_WARN:
+            warnings.append(
+                "Face visibility was low for much of the recording. Keep your face centered and well lit for better accuracy."
+            )
+
+        if global_motion < 0.03:
+            warnings.append(
+                "Very low motion was detected. Natural speaking gestures improve analysis confidence."
+            )
+
+        return warnings
 
     def _extract_fallback_feature_vector(self, video_path: str, max_seconds: int) -> Tuple[Dict[str, float], Dict[str, Any]]:
         """Fallback analyzer using OpenCV face detection + motion proxies."""

@@ -84,7 +84,14 @@ def upload_video():
     try:
         analysis = analyzer.analyze_video(str(video_path), max_seconds=60)
     except Exception as exc:
-        return jsonify({"error": f"Analysis failed: {exc}"}), 500
+        message = str(exc)
+        lowered = message.lower()
+
+        # User-correctable recording issues should be 400-level errors.
+        if "recording is too short" in lowered or "no visible person detected" in lowered:
+            return jsonify({"error": message}), 400
+
+        return jsonify({"error": f"Analysis failed: {message}"}), 500
 
     payload: Dict[str, object] = {
         "session_id": session_id,
@@ -112,6 +119,7 @@ def results_page(id: str):
         question=payload.get("question", "N/A"),
         scores=payload["analysis"]["scores"],
         feedback=payload["analysis"]["feedback"],
+        quality_warnings=payload["analysis"].get("metadata", {}).get("quality_warnings", []),
     )
 
 

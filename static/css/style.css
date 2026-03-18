@@ -132,3 +132,13 @@ body {
   margin: 0.5rem 0 0;
   font-weight: 700;
 }
+
+.warning-card {
+  border: 1px solid #f4d4a6;
+  background: #fff8ee;
+}
+
+.warning-card h2 {
+  margin-top: 0;
+  color: #a15b00;
+}

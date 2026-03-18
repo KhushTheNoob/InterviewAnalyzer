@@ -17,6 +17,17 @@
       <p><strong>Question:</strong> {{ question }}</p>
     </div>
 
+    {% if quality_warnings and quality_warnings|length > 0 %}
+      <section class="card warning-card">
+        <h2>⚠️ Analysis Quality Notice</h2>
+        <ul>
+          {% for warning in quality_warnings %}
+            <li>{{ warning }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
     <section class="scores-grid">
       {% for key, value in scores.items() %}
         <div class="score-card">
