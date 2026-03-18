@@ -6,13 +6,13 @@ from typing import Dict
 
 
 # Posture thresholds
-POSTURE_UPRIGHT_GOOD = 0.70
-SLOUCH_RATIO_BAD = 0.35
-SHOULDER_ALIGNMENT_GOOD = 0.70
+POSTURE_UPRIGHT_GOOD = 0.60
+SLOUCH_RATIO_BAD = 0.50
+SHOULDER_ALIGNMENT_GOOD = 0.60
 
 # Gesture thresholds
-GESTURE_FREQUENCY_MIN = 0.30
-GESTURE_FREQUENCY_MAX = 1.80
+GESTURE_FREQUENCY_MIN = 0.06
+GESTURE_FREQUENCY_MAX = 0.45
 GESTURE_VARIETY_GOOD = 0.45
 NERVOUS_GESTURE_BAD = 0.30
 FACE_TOUCH_BAD = 0.20
@@ -22,7 +22,9 @@ EYE_CONTACT_GOOD = 0.65
 TENSE_EXPRESSION_BAD = 0.35
 
 # Global movement thresholds
-GLOBAL_MOTION_BAD = 2.0
+GLOBAL_MOTION_BAD = 0.65
+GLOBAL_MOTION_STD_BAD = 0.25
+CONFIDENCE_MOTION_IDEAL = 0.18
 
 # Weighted final aggregation
 WEIGHT_CONFIDENCE = 0.30
@@ -65,10 +67,13 @@ def _score_confidence(fv: Dict[str, float]) -> float:
     eye_contact = fv.get("eye_contact_ratio", 0.0)
     upright = fv.get("upright_posture_ratio", 0.0)
     global_motion = fv.get("global_motion_mean", 0.0)
+    global_motion_std = fv.get("global_motion_std", 0.0)
 
     eye_part = _scale_ratio(eye_contact, EYE_CONTACT_GOOD)
     upright_part = _scale_ratio(upright, POSTURE_UPRIGHT_GOOD)
-    motion_part = 1.0 - min(global_motion / GLOBAL_MOTION_BAD, 1.0)
+    motion_balance = 1.0 - min(abs(global_motion - CONFIDENCE_MOTION_IDEAL) / CONFIDENCE_MOTION_IDEAL, 1.0)
+    stability_part = 1.0 - min(global_motion_std / GLOBAL_MOTION_STD_BAD, 1.0)
+    motion_part = (motion_balance * 0.65) + (stability_part * 0.35)
 
     return _map_unit_to_score((eye_part * 0.45) + (upright_part * 0.35) + (motion_part * 0.20))
 
